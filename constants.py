@@ -50,11 +50,19 @@ RAG_TOP_FOLDER_PATH = "./data"
 SUPPORTED_EXTENSIONS = {
     ".pdf": PyMuPDFLoader,
     ".docx": Docx2txtLoader,
-    ".csv": lambda path: CSVLoader(path, encoding="utf-8")
+    ".csv": lambda path: CSVLoader(path, encoding="utf-8"),
+    ".txt": lambda path: TextLoader(path, encoding="utf-8")
 }
 WEB_URL_LOAD_TARGETS = [
     "https://generative-ai.web-camp.io/"
 ]
+
+# ベクターストアから取得する関連ドキュメントの数
+RETRIEVER_TOP_K = 5
+
+# ドキュメントのチャンク分割設定
+CHUNK_SIZE = 1000  # 1つのチャンクの文字数
+CHUNK_OVERLAP = 200  # チャンク間で重複させる文字数
 
 
 # ==========================================

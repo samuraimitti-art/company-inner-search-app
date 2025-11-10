@@ -9,6 +9,7 @@
 import os
 from langchain.chains import RetrievalQA
 from langchain_openai import ChatOpenAI
+import constants as ct
 
 def handle_user_input(user_input):
     """
@@ -22,17 +23,28 @@ def handle_user_input(user_input):
     
     try:
         vectorstore = st.session_state.vectorstore
-        retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+        retriever = vectorstore.as_retriever(search_kwargs={"k": ct.RETRIEVER_TOP_K})
 
         # ダミーベクターストアの場合は簡単な応答を返す
         if hasattr(st.session_state.vectorstore, '__class__') and 'Dummy' in st.session_state.vectorstore.__class__.__name__:
             results = retriever.get_relevant_documents(user_input)
             
             answer_text = "### 🔍 検索結果（テストモード）\n\n"
-            for doc in results:
+            answer_text += "**参照ドキュメント:**\n"
+            for idx, doc in enumerate(results, 1):
                 source = doc.metadata.get("source", "不明なソース")
                 page = doc.metadata.get("page", None)
-                answer_text += f"- 📄 **{os.path.basename(source)}**\n"
+                chunk = doc.metadata.get("chunk", None)
+                
+                if source.endswith(".pdf"):
+                    if page is not None:
+                        answer_text += f"{idx}. 📄 **{os.path.basename(source)}** - {page + 1}ページ目\n"
+                    else:
+                        answer_text += f"{idx}. 📄 **{os.path.basename(source)}**\n"
+                elif chunk is not None:
+                    answer_text += f"{idx}. 📄 **{os.path.basename(source)}** - セクション{chunk + 1}\n"
+                else:
+                    answer_text += f"{idx}. 📄 **{os.path.basename(source)}**\n"
             
             answer_text += "\n---\n"
             answer_text += f"**テスト応答:** \n入力内容「{user_input}」を受け取りました。\n"
@@ -47,18 +59,34 @@ def handle_user_input(user_input):
 
         results = retriever.get_relevant_documents(user_input)
 
-        answer_text = "### 🔍 検索結果\n\n"
-        for doc in results:
+        answer_text = "### 🔍 参照ドキュメント\n\n"
+        for idx, doc in enumerate(results, 1):
             source = doc.metadata.get("source", "不明なソース")
             page = doc.metadata.get("page", None)
+            chunk = doc.metadata.get("chunk", None)
 
             if source.endswith(".pdf"):
                 if page is not None:
-                    answer_text += f"- 📄 **{os.path.basename(source)}**（p.{page + 1}）\n"
+                    answer_text += f"{idx}. 📄 **{os.path.basename(source)}** - {page + 1}ページ目\n"
                 else:
-                    answer_text += f"- 📄 **{os.path.basename(source)}**\n"
+                    answer_text += f"{idx}. 📄 **{os.path.basename(source)}**\n"
+            elif source.endswith(".docx"):
+                if chunk is not None:
+                    answer_text += f"{idx}. 📄 **{os.path.basename(source)}** - セクション{chunk + 1}\n"
+                else:
+                    answer_text += f"{idx}. 📄 **{os.path.basename(source)}**\n"
+            elif source.endswith(".csv"):
+                if chunk is not None:
+                    answer_text += f"{idx}. 📊 **{os.path.basename(source)}** - データセクション{chunk + 1}\n"
+                else:
+                    answer_text += f"{idx}. 📊 **{os.path.basename(source)}**\n"
+            elif source.endswith(".txt"):
+                if chunk is not None:
+                    answer_text += f"{idx}. 📝 **{os.path.basename(source)}** - セクション{chunk + 1}\n"
+                else:
+                    answer_text += f"{idx}. � **{os.path.basename(source)}**\n"
             else:
-                answer_text += f"- 📄 **{os.path.basename(source)}**\n"
+                answer_text += f"{idx}. 📄 **{os.path.basename(source)}**\n"
 
         answer_text += "\n---\n"
 

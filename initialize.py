@@ -10,6 +10,8 @@ import os
 from langchain_community.document_loaders import PyMuPDFLoader, Docx2txtLoader, CSVLoader, TextLoader
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+import constants as ct
 
 def create_dummy_vectorstore():
     """
@@ -47,6 +49,13 @@ def create_dummy_vectorstore():
 
 def load_documents(data_path):
     documents = []
+    
+    # テキストスプリッターの初期化
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=ct.CHUNK_SIZE,
+        chunk_overlap=ct.CHUNK_OVERLAP
+    )
+    
     for root, dirs, files in os.walk(data_path):
         for file in files:
             file_path = os.path.join(root, file)
@@ -55,20 +64,45 @@ def load_documents(data_path):
             # 拡張子ごとに処理
             if ext == ".pdf":
                 loader = PyMuPDFLoader(file_path)
-                pdf_docs = loader.load_and_split()
-                documents.extend(pdf_docs)
+                pdf_docs = loader.load()
+                # チャンク分割を適用（メタデータを保持）
+                split_docs = text_splitter.split_documents(pdf_docs)
+                # ページ番号情報が保持されていることを確認
+                for doc in split_docs:
+                    if "page" not in doc.metadata and "source" in doc.metadata:
+                        # ページ情報がない場合は0を設定
+                        doc.metadata["page"] = 0
+                documents.extend(split_docs)
 
             elif ext == ".docx":
                 loader = Docx2txtLoader(file_path)
-                documents.extend(loader.load())
+                docx_docs = loader.load()
+                # チャンク分割を適用
+                split_docs = text_splitter.split_documents(docx_docs)
+                # DOCXファイルにはページ概念がないため、チャンク番号を追加
+                for idx, doc in enumerate(split_docs):
+                    doc.metadata["chunk"] = idx
+                documents.extend(split_docs)
 
             elif ext == ".csv":
                 loader = CSVLoader(file_path)
-                documents.extend(loader.load())
+                csv_docs = loader.load()
+                # チャンク分割を適用
+                split_docs = text_splitter.split_documents(csv_docs)
+                # CSVファイルには行番号情報を追加
+                for idx, doc in enumerate(split_docs):
+                    doc.metadata["chunk"] = idx
+                documents.extend(split_docs)
 
-            elif ext == ".txt":  # ← ここを新規追加！
+            elif ext == ".txt":
                 loader = TextLoader(file_path, encoding="utf-8")
-                documents.extend(loader.load())
+                txt_docs = loader.load()
+                # チャンク分割を適用
+                split_docs = text_splitter.split_documents(txt_docs)
+                # TXTファイルにはチャンク番号を追加
+                for idx, doc in enumerate(split_docs):
+                    doc.metadata["chunk"] = idx
+                documents.extend(split_docs)
 
     return documents
 
